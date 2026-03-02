@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tienda de Informatica</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="light">
+  <header class="topbar">
+    <div>
+      <h1>Tienda de Informatica</h1>
+      <p>Carrito de compras de productos tecnologicos</p>
+    </div>
+    <div class="controls">
+      <label class="select-wrap">
+        Moneda:
+        <select id="currency-select" aria-label="Seleccionar moneda">
+          <option value="GTQ">Quetzales (Q)</option>
+          <option value="USD">Dolares (USD)</option>
+        </select>
+      </label>
+      <button id="theme-toggle" type="button">Modo Oscuro</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="products-section">
+      <h2>Productos</h2>
+      <div id="product-list" class="product-grid"></div>
+    </section>
+
+    <aside class="cart-section">
+      <h2>Carrito</h2>
+      <ul id="cart-items" class="cart-items"></ul>
+      <div class="cart-total">
+        Total: <strong id="cart-total">Q0.00</strong>
+      </div>
+      <div class="cart-actions">
+        <button id="clear-cart" type="button" class="danger">Vaciar carrito</button>
+      </div>
+
+      <section class="payment">
+        <h3>Validar pago</h3>
+        <form id="payment-form" novalidate>
+          <label>
+            Nombre completo
+            <input id="payer-name" type="text" required placeholder="Ej. Maria Lopez">
+          </label>
+          <label>
+            Tarjeta (16 digitos)
+            <input id="card-number" type="text" inputmode="numeric" maxlength="19" autocomplete="cc-number" required placeholder="0000 0000 0000 0000">
+          </label>
+          <div class="payment-row">
+            <label>
+              Vencimiento (MM/YY)
+              <input id="card-expiry" type="text" inputmode="numeric" maxlength="5" autocomplete="cc-exp" required placeholder="12/29">
+            </label>
+            <label>
+              CVV
+              <input id="card-cvv" type="password" inputmode="numeric" maxlength="4" autocomplete="cc-csc" required placeholder="123">
+            </label>
+          </div>
+          <label>
+            Monto pagado
+            <input id="payment-amount" type="number" min="0" step="0.01" required placeholder="0.00">
+          </label>
+          <button type="submit" class="success">Validar pago</button>
+        </form>
+        <p class="hint">Prueba: 4242 4242 4242 4242 | Vence: 12/29 | CVV: 123</p>
+
+        <button id="generate-pdf" type="button" class="secondary" disabled>Generar recibo PDF</button>
+      </section>
+      <p id="status-message" class="status-message" aria-live="polite"></p>
+    </aside>
+  </main>
+
+  <div id="preview-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+    <div class="modal-card">
+      <button id="close-preview" class="close-modal" type="button" aria-label="Cerrar vista previa">x</button>
+      <img id="preview-image" src="" alt="Vista previa del producto">
+      <h3 id="preview-title"></h3>
+      <p id="preview-price"></p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
