@@ -8,6 +8,29 @@ const FUNNY_CAT_PHRASES = [
   "Mision tecno completada"
 ];
 const NYAN_CAT_IMAGE_URL = "https://media.giphy.com/media/sIIhZliB2McAo/giphy.gif";
+const AUTHORIZED_PAYMENT_USERS = [
+  {
+    name: "Maria Lopez",
+    cardNumber: "4242424242424242",
+    expiry: "12/29",
+    cvv: "123",
+    accountLabel: "Cuenta Tecno Plus"
+  },
+  {
+    name: "Carlos Ramirez",
+    cardNumber: "5555555555554444",
+    expiry: "11/30",
+    cvv: "456",
+    accountLabel: "Cuenta Quantum"
+  },
+  {
+    name: "Ana Torres",
+    cardNumber: "4012888888881881",
+    expiry: "08/31",
+    cvv: "321",
+    accountLabel: "Cuenta Neon"
+  }
+];
 
 const products = [
   {
@@ -385,6 +408,19 @@ function onValidatePayment(event) {
     return;
   }
 
+  const authorizedUser = findAuthorizedPaymentUser(payerName, cardNumber, cardExpiry, cardCvv);
+  if (!authorizedUser) {
+    showPaymentErrorAlert(
+      "Tarjeta no autorizada",
+      "Los datos no coinciden con una cuenta habilitada.",
+      [
+        "Verifica nombre, numero de tarjeta, vencimiento y CVV.",
+        ...AUTHORIZED_PAYMENT_USERS.map((user) => `${user.name}: ${maskCardNumber(user.cardNumber)} | ${user.expiry}`)
+      ]
+    );
+    return;
+  }
+
   if (!Number.isFinite(paymentAmountDisplay) || paymentAmountDisplay <= 0) {
     showPaymentErrorAlert("Monto invalido", "Ingresa un monto de pago valido.");
     return;
@@ -423,7 +459,9 @@ function onValidatePayment(event) {
     }),
     totalQ,
     paidQ: paymentAmountQ,
-    changeQ
+    changeQ,
+    accountLabel: authorizedUser.accountLabel,
+    maskedCard: maskCardNumber(authorizedUser.cardNumber)
   };
 
   generatePdfBtn.disabled = false;
@@ -463,38 +501,162 @@ function generateReceiptPdf() {
   }
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
   const data = latestReceiptData;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  const contentWidth = pageWidth - margin * 2;
 
-  doc.setFontSize(16);
-  doc.text(`Recibo de Compra - ${STORE_NAME}`, 14, 18);
+  const drawPageShell = () => {
+    doc.setFillColor(8, 15, 32);
+    doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+    doc.setDrawColor(18, 47, 80);
+    doc.setLineWidth(0.15);
+    for (let y = 46; y < pageHeight; y += 8) {
+      doc.line(0, y, pageWidth, y);
+    }
+    for (let x = 0; x < pageWidth; x += 8) {
+      doc.line(x, 46, x, pageHeight);
+    }
+
+    doc.setFillColor(10, 29, 56);
+    doc.rect(0, 0, pageWidth, 44, "F");
+    doc.setFillColor(0, 163, 255);
+    doc.rect(0, 42, pageWidth, 2, "F");
+
+    doc.setDrawColor(0, 219, 255);
+    doc.setLineWidth(0.6);
+    doc.circle(pageWidth - 24, 15, 7);
+    doc.circle(pageWidth - 24, 15, 3.5);
+    doc.line(pageWidth - 42, 15, pageWidth - 31, 15);
+    doc.line(pageWidth - 24, 23, pageWidth - 24, 33);
+  };
+
+  const drawTableHeader = (startY) => {
+    doc.setFillColor(16, 52, 92);
+    doc.roundedRect(margin, startY, contentWidth, 8, 1.5, 1.5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(214, 236, 255);
+    doc.text("Producto", margin + 3, startY + 5.4);
+    doc.text("Cant.", margin + 100, startY + 5.4, { align: "center" });
+    doc.text("Precio", margin + 136, startY + 5.4, { align: "right" });
+    doc.text("Subtotal", margin + contentWidth - 3, startY + 5.4, { align: "right" });
+  };
+
+  drawPageShell();
+
+  doc.setTextColor(240, 248, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.text(STORE_NAME, margin, 16);
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.text(`Transaccion: ${data.transactionId}`, 14, 28);
-  doc.text(`Fecha: ${data.date}`, 14, 35);
-  doc.text(`Cliente: ${data.payerName}`, 14, 42);
+  doc.text("Recibo de compra digital", margin, 23);
 
-  let y = 55;
-  doc.setFontSize(12);
-  doc.text("Detalle:", 14, y);
-  y += 8;
-  doc.setFontSize(10);
+  doc.setFillColor(13, 36, 68);
+  doc.setDrawColor(46, 117, 183);
+  doc.roundedRect(margin, 28, contentWidth, 27, 2.2, 2.2, "FD");
+  doc.setFontSize(9.5);
+  doc.setTextColor(212, 232, 250);
+  doc.text(`Transaccion: ${data.transactionId}`, margin + 3, 35);
+  doc.text(`Fecha: ${data.date}`, margin + 3, 41);
+  doc.text(`Cliente: ${data.payerName}`, margin + 3, 47);
+  doc.text(`Tarjeta: ${data.maskedCard || "**** **** **** ----"}`, margin + 100, 35);
+  doc.text(`Perfil: ${data.accountLabel || "Cuenta registrada"}`, margin + 100, 41);
+  doc.text(`Moneda: ${data.currency}`, margin + 100, 47);
 
-  data.items.forEach((item) => {
-    const line = `${item.name} x${item.qty} - ${formatCurrencyForReceipt(item.subtotalQ, data.currency)}`;
-    doc.text(line, 14, y);
-    y += 7;
+  let y = 63;
+  drawTableHeader(y);
+  y += 11;
+
+  data.items.forEach((item, index) => {
+    const productLines = doc.splitTextToSize(item.name, 86);
+    const rowHeight = Math.max(8, productLines.length * 4 + 2);
+
+    if (y + rowHeight > pageHeight - 50) {
+      doc.addPage();
+      drawPageShell();
+      y = 22;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(191, 226, 255);
+      doc.text("Detalle de productos (continuacion)", margin, 15);
+      drawTableHeader(y);
+      y += 11;
+    }
+
+    const rowFill = index % 2 === 0 ? [12, 30, 56] : [10, 25, 47];
+    doc.setFillColor(rowFill[0], rowFill[1], rowFill[2]);
+    doc.setDrawColor(30, 71, 116);
+    doc.roundedRect(margin, y - 1, contentWidth, rowHeight, 1.2, 1.2, "FD");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.8);
+    doc.setTextColor(230, 243, 255);
+    doc.text(productLines, margin + 2, y + 2.8);
+    doc.text(String(item.qty), margin + 100, y + 2.8, { align: "center" });
+    doc.text(formatCurrencyForReceipt(item.priceQ, data.currency), margin + 136, y + 2.8, { align: "right" });
+    doc.text(formatCurrencyForReceipt(item.subtotalQ, data.currency), margin + contentWidth - 3, y + 2.8, { align: "right" });
+    y += rowHeight + 2;
   });
 
-  y += 4;
-  doc.setFontSize(11);
-  doc.text(`Total: ${formatCurrencyForReceipt(data.totalQ, data.currency)}`, 14, y);
-  y += 7;
-  doc.text(`Pagado: ${formatCurrencyForReceipt(data.paidQ, data.currency)}`, 14, y);
-  y += 7;
-  doc.text(`Vuelto: ${formatCurrencyForReceipt(data.changeQ, data.currency)}`, 14, y);
+  if (y > pageHeight - 52) {
+    doc.addPage();
+    drawPageShell();
+    y = 28;
+  }
+
+  const summaryWidth = 86;
+  const summaryX = pageWidth - margin - summaryWidth;
+  doc.setFillColor(13, 36, 68);
+  doc.setDrawColor(46, 117, 183);
+  doc.roundedRect(summaryX, y + 2, summaryWidth, 32, 2, 2, "FD");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(210, 235, 255);
+  doc.text("Resumen de pago", summaryX + 3, y + 8);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.text("Total:", summaryX + 3, y + 15);
+  doc.text(formatCurrencyForReceipt(data.totalQ, data.currency), summaryX + summaryWidth - 3, y + 15, { align: "right" });
+  doc.text("Pagado:", summaryX + 3, y + 21);
+  doc.text(formatCurrencyForReceipt(data.paidQ, data.currency), summaryX + summaryWidth - 3, y + 21, { align: "right" });
+  doc.setFont("helvetica", "bold");
+  doc.text("Vuelto:", summaryX + 3, y + 27);
+  doc.text(formatCurrencyForReceipt(data.changeQ, data.currency), summaryX + summaryWidth - 3, y + 27, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(128, 188, 235);
+  doc.text("TECNOSTORE // RECIBO ELECTRONICO VERIFICADO", margin, pageHeight - 10);
 
   doc.save(`${data.transactionId}.pdf`);
   showNyanSuccessAlert("Recibo generado", "Recibo PDF generado correctamente.");
+}
+
+function findAuthorizedPaymentUser(payerName, cardNumber, cardExpiry, cardCvv) {
+  const normalizedPayerName = normalizeName(payerName);
+  return AUTHORIZED_PAYMENT_USERS.find((user) =>
+    normalizeName(user.name) === normalizedPayerName &&
+    user.cardNumber === cardNumber &&
+    user.expiry === cardExpiry &&
+    user.cvv === cardCvv
+  );
+}
+
+function normalizeName(value) {
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function maskCardNumber(cardNumber) {
+  return `**** **** **** ${cardNumber.slice(-4)}`;
 }
 
 function openPreview(productId) {

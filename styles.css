@@ -253,9 +253,27 @@ button {
   font-size: 0.9rem;
 }
 
-.hint {
+.hint-card-list {
   margin: 0 0 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.65rem;
+  background: var(--surface-alt);
+}
+
+.hint-title {
+  margin: 0 0 0.3rem;
   font-size: 0.82rem;
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.hint-list {
+  margin: 0;
+  padding-left: 1.05rem;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.79rem;
   color: var(--text-soft);
 }
 
