@@ -184,9 +184,29 @@ button {
   color: var(--text-soft);
 }
 
+.product-stock {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--success);
+}
+
+.product-stock.is-low {
+  color: #b56a00;
+}
+
+.product-stock.is-out {
+  color: var(--danger);
+}
+
 .product-body button {
   background: var(--primary);
   color: #fff;
+}
+
+.product-body button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .cart-items {
@@ -251,6 +271,22 @@ button {
   display: grid;
   gap: 0.3rem;
   font-size: 0.9rem;
+}
+
+.payment-total-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.62rem 0.75rem;
+  background: var(--surface-alt);
+  font-size: 0.93rem;
+}
+
+.payment-total-preview strong {
+  font-size: 1.02rem;
+  color: var(--primary);
 }
 
 .hint-card-list {

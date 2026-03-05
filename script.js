@@ -37,6 +37,7 @@ const products = [
     id: 1,
     name: "Laptop Gamer 15",
     priceQ: 6899,
+    stock: 4,
     colorA: "#2d7ff9",
     colorB: "#6dd5fa",
     icon: "LAPTOP",
@@ -46,6 +47,7 @@ const products = [
     id: 2,
     name: "Monitor 27 Full HD",
     priceQ: 1749,
+    stock: 6,
     colorA: "#38b2ac",
     colorB: "#7ef9c4",
     icon: "MONITOR",
@@ -55,6 +57,7 @@ const products = [
     id: 3,
     name: "Teclado Mecanico RGB",
     priceQ: 499,
+    stock: 8,
     colorA: "#ff7b54",
     colorB: "#ffd36f",
     icon: "KEYBOARD",
@@ -64,6 +67,7 @@ const products = [
     id: 4,
     name: "Mouse Inalambrico Pro",
     priceQ: 289,
+    stock: 10,
     colorA: "#8663f7",
     colorB: "#c9b6ff",
     icon: "MOUSE",
@@ -73,6 +77,7 @@ const products = [
     id: 5,
     name: "SSD 1TB NVMe",
     priceQ: 899,
+    stock: 5,
     colorA: "#1e8f7f",
     colorB: "#8ae5cf",
     icon: "SSD",
@@ -82,6 +87,7 @@ const products = [
     id: 6,
     name: "Audifonos Bluetooth",
     priceQ: 399,
+    stock: 7,
     colorA: "#ef4444",
     colorB: "#f9a8d4",
     icon: "AUDIO",
@@ -103,7 +109,7 @@ const paymentForm = document.getElementById("payment-form");
 const cardNumberInput = document.getElementById("card-number");
 const cardExpiryInput = document.getElementById("card-expiry");
 const cardCvvInput = document.getElementById("card-cvv");
-const paymentAmountInput = document.getElementById("payment-amount");
+const paymentTotalValueEl = document.getElementById("payment-total-value");
 const generatePdfBtn = document.getElementById("generate-pdf");
 const previewModal = document.getElementById("preview-modal");
 const previewImage = document.getElementById("preview-image");
@@ -124,7 +130,6 @@ function initialize() {
 
   currencySelect.value = selectedCurrency;
   setupEvents();
-  updatePaymentPlaceholder();
   renderProducts();
   renderCart();
 }
@@ -176,18 +181,26 @@ function onImageError(event) {
 }
 
 function renderProducts() {
-  productListEl.innerHTML = products.map((product) => `
-    <article class="product-card">
-      <button class="preview-trigger" type="button" data-action="preview" data-id="${product.id}">
-        <img src="${product.image}" data-fallback="${product.fallbackImage}" alt="${product.name}">
-      </button>
-      <div class="product-body">
-        <h3 class="product-name">${product.name}</h3>
-        <p class="product-price">${formatCurrencyFromQ(product.priceQ)}</p>
-        <button type="button" data-action="add" data-id="${product.id}">Agregar al carrito</button>
-      </div>
-    </article>
-  `).join("");
+  productListEl.innerHTML = products.map((product) => {
+    const remainingStock = getRemainingStock(product.id);
+    const stockClass = remainingStock === 0 ? "is-out" : remainingStock <= 2 ? "is-low" : "";
+    const addDisabled = remainingStock === 0 ? "disabled" : "";
+    const addLabel = remainingStock === 0 ? "Sin existencias" : "Agregar al carrito";
+
+    return `
+      <article class="product-card">
+        <button class="preview-trigger" type="button" data-action="preview" data-id="${product.id}">
+          <img src="${product.image}" data-fallback="${product.fallbackImage}" alt="${product.name}">
+        </button>
+        <div class="product-body">
+          <h3 class="product-name">${product.name}</h3>
+          <p class="product-price">${formatCurrencyFromQ(product.priceQ)}</p>
+          <p class="product-stock ${stockClass}">Existencias: ${remainingStock} de ${product.stock}</p>
+          <button type="button" data-action="add" data-id="${product.id}" ${addDisabled}>${addLabel}</button>
+        </div>
+      </article>
+    `;
+  }).join("");
   applyImageFallbackIfNeeded();
 }
 
@@ -220,6 +233,7 @@ function renderCart() {
 
   const totalQ = getCartTotalQ();
   cartTotalEl.textContent = formatCurrencyFromQ(totalQ);
+  updatePaymentTotalPreview(totalQ);
 }
 
 function onProductGridClick(event) {
@@ -251,17 +265,32 @@ function onCartClick(event) {
     .map((item) => item.productId === productId ? { ...item, qty: item.qty - 1 } : item)
     .filter((item) => item.qty > 0);
 
+  renderProducts();
   renderCart();
 }
 
 function addToCart(productId) {
   const product = products.find((entry) => entry.id === productId);
+  if (!product) {
+    return;
+  }
+
+  if (getRemainingStock(productId) <= 0) {
+    showPaymentErrorAlert(
+      "Sin existencias",
+      "Este producto ya alcanzo su limite de existencias.",
+      [`Producto: ${product.name}`, `Existencias maximas: ${product.stock}`]
+    );
+    return;
+  }
+
   const item = cart.find((entry) => entry.productId === productId);
   if (item) {
     item.qty += 1;
   } else {
     cart.push({ productId, qty: 1 });
   }
+  renderProducts();
   renderCart();
   showFunnyCatAlert(product?.name || "Producto");
 }
@@ -335,12 +364,26 @@ async function onClearCartClick() {
 
 function clearCart() {
   cart = [];
+  renderProducts();
   renderCart();
   showStatus("Carrito vaciado.", "success");
 }
 
 function getCartItemCount() {
   return cart.reduce((acc, item) => acc + item.qty, 0);
+}
+
+function getRemainingStock(productId) {
+  const product = products.find((entry) => entry.id === productId);
+  if (!product) {
+    return 0;
+  }
+
+  const quantityInCart = cart
+    .filter((item) => item.productId === productId)
+    .reduce((acc, item) => acc + item.qty, 0);
+
+  return Math.max(product.stock - quantityInCart, 0);
 }
 
 function getCartTotalQ() {
@@ -355,11 +398,10 @@ function onCurrencyChange(event) {
   localStorage.setItem("shop_currency", selectedCurrency);
   renderProducts();
   renderCart();
-  updatePaymentPlaceholder();
 }
 
-function updatePaymentPlaceholder() {
-  paymentAmountInput.placeholder = selectedCurrency === "GTQ" ? "Q0.00" : "$0.00";
+function updatePaymentTotalPreview(totalQ) {
+  paymentTotalValueEl.textContent = formatCurrencyFromQ(totalQ);
 }
 
 function toggleTheme() {
@@ -385,7 +427,6 @@ function onValidatePayment(event) {
   const cardNumberRaw = document.getElementById("card-number").value;
   const cardExpiry = document.getElementById("card-expiry").value.trim();
   const cardCvv = document.getElementById("card-cvv").value.trim();
-  const paymentAmountDisplay = Number(String(paymentAmountInput.value).replace(",", "."));
   const cardNumber = cardNumberRaw.replace(/\D/g, "");
 
   if (payerName.length < 3) {
@@ -421,28 +462,6 @@ function onValidatePayment(event) {
     return;
   }
 
-  if (!Number.isFinite(paymentAmountDisplay) || paymentAmountDisplay <= 0) {
-    showPaymentErrorAlert("Monto invalido", "Ingresa un monto de pago valido.");
-    return;
-  }
-
-  const paymentAmountQ = roundCurrency(fromDisplayCurrencyToQ(paymentAmountDisplay));
-  const requiredPaymentQ = getRequiredPaymentQ(totalQ);
-  if (paymentAmountQ < requiredPaymentQ) {
-    const missingQ = roundCurrency(requiredPaymentQ - paymentAmountQ);
-    showPaymentErrorAlert(
-      "Monto insuficiente",
-      "El monto pagado es menor al total de la compra.",
-      [
-        `Total requerido: ${formatCurrencyFromQ(requiredPaymentQ)}`,
-        `Monto ingresado: ${formatCurrencyFromQ(paymentAmountQ)}`,
-        `Faltante: ${formatCurrencyFromQ(missingQ)}`
-      ]
-    );
-    return;
-  }
-
-  const changeQ = roundCurrency(paymentAmountQ - requiredPaymentQ);
   latestReceiptData = {
     transactionId: `TX-${Date.now()}`,
     date: new Date().toLocaleString("es-GT"),
@@ -458,8 +477,7 @@ function onValidatePayment(event) {
       };
     }),
     totalQ,
-    paidQ: paymentAmountQ,
-    changeQ,
+    paidQ: totalQ,
     accountLabel: authorizedUser.accountLabel,
     maskedCard: maskCardNumber(authorizedUser.cardNumber)
   };
@@ -467,12 +485,12 @@ function onValidatePayment(event) {
   generatePdfBtn.disabled = false;
   cart = [];
   paymentForm.reset();
-  updatePaymentPlaceholder();
+  renderProducts();
   renderCart();
 
   showNyanSuccessAlert(
     "Pago validado",
-    `Pago validado. Vuelto: ${formatCurrencyFromQ(changeQ)}. Ya puedes generar el recibo PDF.`
+    `Pago validado. Total cobrado: ${formatCurrencyFromQ(totalQ)}. Ya puedes generar el recibo PDF.`
   );
 }
 
@@ -612,7 +630,7 @@ function generateReceiptPdf() {
   const summaryX = pageWidth - margin - summaryWidth;
   doc.setFillColor(13, 36, 68);
   doc.setDrawColor(46, 117, 183);
-  doc.roundedRect(summaryX, y + 2, summaryWidth, 32, 2, 2, "FD");
+  doc.roundedRect(summaryX, y + 2, summaryWidth, 26, 2, 2, "FD");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(210, 235, 255);
@@ -621,11 +639,8 @@ function generateReceiptPdf() {
   doc.setFontSize(9.5);
   doc.text("Total:", summaryX + 3, y + 15);
   doc.text(formatCurrencyForReceipt(data.totalQ, data.currency), summaryX + summaryWidth - 3, y + 15, { align: "right" });
-  doc.text("Pagado:", summaryX + 3, y + 21);
+  doc.text("Cobrado:", summaryX + 3, y + 21);
   doc.text(formatCurrencyForReceipt(data.paidQ, data.currency), summaryX + summaryWidth - 3, y + 21, { align: "right" });
-  doc.setFont("helvetica", "bold");
-  doc.text("Vuelto:", summaryX + 3, y + 27);
-  doc.text(formatCurrencyForReceipt(data.changeQ, data.currency), summaryX + summaryWidth - 3, y + 27, { align: "right" });
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -687,22 +702,6 @@ function formatCurrencyForReceipt(amountQ, currency) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amountQ / EXCHANGE_RATE);
   }
   return new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ", minimumFractionDigits: 2 }).format(amountQ);
-}
-
-function fromDisplayCurrencyToQ(value) {
-  return selectedCurrency === "USD" ? value * EXCHANGE_RATE : value;
-}
-
-function getRequiredPaymentQ(totalQ) {
-  if (selectedCurrency === "USD") {
-    const totalRoundedUsd = roundCurrency(totalQ / EXCHANGE_RATE);
-    return roundCurrency(totalRoundedUsd * EXCHANGE_RATE);
-  }
-  return roundCurrency(totalQ);
-}
-
-function roundCurrency(value) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function showStatus(message, type) {

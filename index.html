@@ -61,10 +61,10 @@
               <input id="card-cvv" type="password" inputmode="numeric" maxlength="4" autocomplete="cc-csc" required placeholder="123">
             </label>
           </div>
-          <label>
-            Monto pagado
-            <input id="payment-amount" type="number" min="0" step="0.01" required placeholder="0.00">
-          </label>
+          <div class="payment-total-preview" aria-live="polite">
+            <span>Monto a pagar</span>
+            <strong id="payment-total-value">Q0.00</strong>
+          </div>
           <button type="submit" class="success">Validar pago</button>
         </form>
         <div class="hint-card-list">
